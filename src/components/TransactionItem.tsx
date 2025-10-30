@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
+import { formatAmount } from "@/lib/currency";
 
 interface Transaction {
   id: string;
@@ -40,7 +41,7 @@ export function TransactionItem({ transaction, onEdit, onDelete }: TransactionIt
           </div>
           <div className="flex items-center gap-4">
             <div className={`text-xl font-bold ${isIncome ? "text-success" : "text-destructive"}`}>
-              {isIncome ? "+" : "-"}${Math.abs(transaction.amount).toFixed(2)}
+              {formatAmount(transaction.amount, transaction.type)}
             </div>
             <div className="flex gap-1">
               <Button

@@ -1,1 +1,7 @@
 project_id = "ddazqjsbibwpcyandhih"
+
+[functions.analyze-finances]
+verify_jwt = true
+
+[functions.check-spending-alerts]
+verify_jwt = true

@@ -1,72 +1,72 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TransactionItem } from "@/components/TransactionItem";
-import { Button } from "@/components/ui/button";
+import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Filter, Plus } from "lucide-react";
-
-const transactions = [
-  {
-    id: "1",
-    title: "Grocery Shopping",
-    amount: -125.50,
-    category: "Food",
-    date: "2024-01-15",
-    type: "expense" as const,
-    description: "Weekly groceries at Whole Foods"
-  },
-  {
-    id: "2",
-    title: "Salary",
-    amount: 3500.00,
-    category: "Income",
-    date: "2024-01-14",
-    type: "income" as const,
-    description: "Monthly salary deposit"
-  },
-  {
-    id: "3",
-    title: "Gas Station",
-    amount: -45.00,
-    category: "Transport",
-    date: "2024-01-13",
-    type: "expense" as const,
-  },
-  {
-    id: "4",
-    title: "Netflix Subscription",
-    amount: -15.99,
-    category: "Entertainment",
-    date: "2024-01-12",
-    type: "expense" as const,
-  },
-  {
-    id: "5",
-    title: "Freelance Project",
-    amount: 850.00,
-    category: "Income",
-    date: "2024-01-11",
-    type: "income" as const,
-    description: "Web design project payment"
-  },
-];
+import { Search, Filter } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Please sign in", description: "You need to be logged in", variant: "destructive" });
+        return;
+      }
+
+      const [transactionsRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*, categories(*)')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false }),
+        supabase
+          .from('categories')
+          .select('*')
+          .eq('user_id', user.id)
+      ]);
+
+      if (transactionsRes.error) throw transactionsRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
+
+      setTransactions(transactionsRes.data || []);
+      setCategories(categoriesRes.data || []);
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredTransactions = transactions.filter((t) => {
+    const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === "all" || t.type === filterType;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Transactions</h1>
-          <p className="text-muted-foreground">View and manage your transactions</p>
+          <p className="text-muted-foreground">View and manage your transactions (All amounts in ₹ INR)</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
+        <AddTransactionDialog categories={categories} onSuccess={fetchData} />
       </div>
 
       <Card>
@@ -102,9 +102,35 @@ export default function Transactions() {
       </Card>
 
       <div className="space-y-3">
-        {transactions.map((transaction) => (
-          <TransactionItem key={transaction.id} transaction={transaction} />
-        ))}
+        {loading ? (
+          <p className="text-center text-muted-foreground">Loading transactions...</p>
+        ) : filteredTransactions.length === 0 ? (
+          <p className="text-center text-muted-foreground">No transactions found. Add your first transaction!</p>
+        ) : (
+          filteredTransactions.map((transaction) => (
+            <TransactionItem 
+              key={transaction.id} 
+              transaction={{
+                ...transaction,
+                category: transaction.categories?.name || 'Uncategorized'
+              }}
+              onEdit={() => console.log('Edit', transaction.id)}
+              onDelete={async () => {
+                await supabase.from('transactions').delete().eq('id', transaction.id);
+                fetchData();
+                toast({ title: "Deleted", description: "Transaction deleted successfully" });
+              }}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="mt-8 p-4 bg-muted/50 rounded-lg border">
+        <h3 className="font-semibold mb-2">📱 SMS Auto-Classification (Coming Soon)</h3>
+        <p className="text-sm text-muted-foreground">
+          To enable automatic SMS reading and classification on your Android device, you'll need to install the native mobile version using Capacitor. 
+          This feature will automatically detect transaction SMSs from banks and create transactions for you!
+        </p>
       </div>
     </div>
   );
