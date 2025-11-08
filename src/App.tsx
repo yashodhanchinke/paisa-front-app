@@ -13,6 +13,7 @@ import Budgets from "./pages/Budgets";
 import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import MobilePreview from "./pages/MobilePreview";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -71,6 +72,7 @@ const App = () => {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/mobile-preview" element={<MobilePreview />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,26 +77,10 @@ serve(async (req) => {
       }
     });
 
-    // Send email if there are alerts
+    // Log alerts (email functionality can be added later with Resend integration)
     if (alerts.length > 0) {
-      const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-      
-      await resend.emails.send({
-        from: 'Budget Alert <onboarding@resend.dev>',
-        to: [profile.email],
-        subject: '⚠️ Spending Alert: You\'re approaching your budget limit',
-        html: `
-          <h2>Spending Alert - Nudge to Save!</h2>
-          <p>Hi! We noticed you're approaching or have exceeded your budget in these categories:</p>
-          <ul>
-            ${alerts.map(a => `<li>${a}</li>`).join('')}
-          </ul>
-          <p><strong>💡 Small reminder:</strong> Every rupee saved today is a rupee invested in your future!</p>
-          <p>Consider reviewing your spending patterns and see where you can optimize.</p>
-        `,
-      });
-
-      console.log('Spending alert sent to:', profile.email);
+      console.log('Spending alerts for user:', user.id);
+      alerts.forEach(alert => console.log(alert));
     }
 
     return new Response(JSON.stringify({ 
@@ -108,8 +91,9 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in check-spending-alerts:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
