@@ -11,18 +11,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim()) {
+      toast({ title: "Name required", description: "Please enter your full name", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: { full_name: fullName }
+        }
       });
 
       if (error) throw error;
@@ -32,6 +42,7 @@ export default function Auth() {
         const { error: profileError } = await supabase.from('profiles').insert({
           user_id: data.user.id,
           email: data.user.email!,
+          full_name: fullName,
           currency: 'INR',
           spending_alerts_enabled: true
         });
@@ -41,8 +52,9 @@ export default function Auth() {
 
       toast({
         title: "Success!",
-        description: "Account created. Please check your email to verify.",
+        description: "Account created successfully!",
       });
+      navigate("/");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -131,6 +143,17 @@ export default function Auth() {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="signup-name">Full Name</Label>
+                  <Input
+                    id="signup-name"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Your Name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
@@ -154,7 +177,7 @@ export default function Auth() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Sign Up"}
+                  {loading ? "Creating account..." : "Create Account"}
                 </Button>
               </form>
             </TabsContent>

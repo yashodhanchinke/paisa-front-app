@@ -1,34 +1,69 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, TrendingUp, DollarSign, Target, Loader2 } from "lucide-react";
+import { Sparkles, TrendingUp, DollarSign, Target, Loader2, History, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-// Sample transactions for demo
-const sampleTransactions = [
-  { id: "1", title: "Grocery Shopping", amount: -125.50, category: "Food", date: "2024-01-15", type: "expense" },
-  { id: "2", title: "Salary", amount: 3500.00, category: "Income", date: "2024-01-14", type: "income" },
-  { id: "3", title: "Gas Station", amount: -45.00, category: "Transport", date: "2024-01-13", type: "expense" },
-  { id: "4", title: "Netflix", amount: -15.99, category: "Entertainment", date: "2024-01-12", type: "expense" },
-  { id: "5", title: "Restaurant", amount: -65.00, category: "Food", date: "2024-01-11", type: "expense" },
-  { id: "6", title: "Uber", amount: -23.50, category: "Transport", date: "2024-01-10", type: "expense" },
-  { id: "7", title: "Coffee Shop", amount: -12.00, category: "Food", date: "2024-01-09", type: "expense" },
-  { id: "8", title: "Freelance", amount: 850.00, category: "Income", date: "2024-01-08", type: "income" },
-  { id: "9", title: "Gym Membership", amount: -50.00, category: "Health", date: "2024-01-07", type: "expense" },
-  { id: "10", title: "Shopping", amount: -180.00, category: "Shopping", date: "2024-01-06", type: "expense" },
-];
+import { formatINR } from "@/lib/currency";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function Reports() {
   const [insights, setInsights] = useState<string>("");
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('ai_insights')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      setHistory(data || []);
+    } catch (error: any) {
+      console.error('Error fetching history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   const analyzeFinances = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Fetch user's actual transactions
+      const { data: transactions, error: transError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (transError) throw transError;
+
+      if (!transactions || transactions.length === 0) {
+        toast.error("No transactions found. Add some transactions first!");
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-finances', {
-        body: { transactions: sampleTransactions }
+        body: { transactions }
       });
 
       if (error) {
@@ -44,6 +79,15 @@ export default function Reports() {
 
       setInsights(data.insights);
       setSummary(data.summary);
+
+      // Save to history
+      await supabase.from('ai_insights').insert({
+        user_id: user.id,
+        insights: data.insights,
+        summary: data.summary
+      });
+
+      fetchHistory();
       toast.success('AI insights generated successfully!');
     } catch (error) {
       console.error('Error analyzing finances:', error);
@@ -53,11 +97,19 @@ export default function Reports() {
     }
   };
 
+  // Email functionality - requires Resend API setup
+
+  const loadHistoryItem = (item: any) => {
+    setInsights(item.insights);
+    setSummary(item.summary);
+    toast.success('Previous insights loaded!');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold mb-2">Financial Insights & Reports</h1>
-        <p className="text-muted-foreground">AI-powered analysis of your spending behavior</p>
+        <p className="text-muted-foreground">AI-powered analysis of your spending behavior (₹ INR)</p>
       </div>
 
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -70,25 +122,26 @@ export default function Reports() {
             Get personalized savings suggestions based on your transaction patterns
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button
-            onClick={analyzeFinances}
-            disabled={loading}
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate AI Insights
-              </>
-            )}
-          </Button>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button
+              onClick={analyzeFinances}
+              disabled={loading}
+              size="lg"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate AI Insights
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -99,7 +152,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Income</p>
-                  <h3 className="text-2xl font-bold text-success">${summary.totalIncome.toFixed(2)}</h3>
+                  <h3 className="text-2xl font-bold text-success">{formatINR(summary.totalIncome)}</h3>
                 </div>
                 <TrendingUp className="h-8 w-8 text-success" />
               </div>
@@ -111,7 +164,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Expenses</p>
-                  <h3 className="text-2xl font-bold text-destructive">${summary.totalExpenses.toFixed(2)}</h3>
+                  <h3 className="text-2xl font-bold text-destructive">{formatINR(summary.totalExpenses)}</h3>
                 </div>
                 <DollarSign className="h-8 w-8 text-destructive" />
               </div>
@@ -163,7 +216,7 @@ export default function Reports() {
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{category}</span>
                         <span className="text-muted-foreground">
-                          ${amount.toFixed(2)} ({percentage}%)
+                          {formatINR(amount)} ({percentage}%)
                         </span>
                       </div>
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -176,6 +229,47 @@ export default function Reports() {
                   );
                 })}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loadingHistory && history.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Insights History
+            </CardTitle>
+            <CardDescription>View your previous AI-generated insights</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+              {history.map((item, index) => (
+                <AccordionItem key={item.id} value={`item-${index}`}>
+                  <AccordionTrigger>
+                    {new Date(item.created_at).toLocaleDateString('en-IN', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4">
+                      <div className="whitespace-pre-wrap text-sm">{item.insights.substring(0, 200)}...</div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => loadHistoryItem(item)}
+                      >
+                        Load Full Report
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </CardContent>
         </Card>
       )}

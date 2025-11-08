@@ -1,12 +1,93 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Settings() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState({
+    full_name: "",
+    email: "",
+    monthly_budget: "",
+    spending_alerts_enabled: true
+  });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setProfile({
+          full_name: data.full_name || "",
+          email: data.email || "",
+          monthly_budget: data.monthly_budget?.toString() || "",
+          spending_alerts_enabled: data.spending_alerts_enabled ?? true
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching profile:', error);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.full_name,
+          monthly_budget: profile.monthly_budget ? parseFloat(profile.monthly_budget) : null,
+          spending_alerts_enabled: profile.spending_alerts_enabled
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({ title: "Success!", description: "Profile updated successfully" });
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-4xl">
+        <Skeleton className="h-12 w-64" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
@@ -22,36 +103,52 @@ export default function Settings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Full Name</Label>
-            <Input id="name" defaultValue="John Doe" />
+            <Input 
+              id="name" 
+              value={profile.full_name}
+              onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" defaultValue="john.doe@example.com" />
+            <Input 
+              id="email" 
+              type="email" 
+              value={profile.email}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">Email cannot be changed</p>
           </div>
-          <Button>Save Changes</Button>
+          <Button onClick={handleSaveProfile} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Currency</CardTitle>
-          <CardDescription>Set your preferred currency</CardDescription>
+          <CardTitle>Budget Settings</CardTitle>
+          <CardDescription>Set your overall monthly budget (₹ INR)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="currency">Default Currency</Label>
-            <Select defaultValue="usd">
-              <SelectTrigger id="currency">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="usd">USD ($)</SelectItem>
-                <SelectItem value="eur">EUR (€)</SelectItem>
-                <SelectItem value="gbp">GBP (£)</SelectItem>
-                <SelectItem value="inr">INR (₹)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="monthly-budget">Monthly Budget Limit (₹)</Label>
+            <Input 
+              id="monthly-budget" 
+              type="number" 
+              step="0.01"
+              placeholder="50000.00"
+              value={profile.monthly_budget}
+              onChange={(e) => setProfile({ ...profile, monthly_budget: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              You'll receive email alerts when you exceed this budget
+            </p>
           </div>
+          <Button onClick={handleSaveProfile} disabled={saving}>
+            {saving ? "Saving..." : "Save Budget"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -65,43 +162,31 @@ export default function Settings() {
             <div className="space-y-0.5">
               <Label>Budget Alerts</Label>
               <p className="text-sm text-muted-foreground">
-                Get notified when you're approaching budget limits
+                Get email notifications when approaching or exceeding budget limits
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch 
+              checked={profile.spending_alerts_enabled}
+              onCheckedChange={(checked) => setProfile({ ...profile, spending_alerts_enabled: checked })}
+            />
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Transaction Reminders</Label>
-              <p className="text-sm text-muted-foreground">
-                Daily reminders to log your transactions
-              </p>
-            </div>
-            <Switch />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Monthly Reports</Label>
-              <p className="text-sm text-muted-foreground">
-                Receive monthly financial summary via email
-              </p>
-            </div>
-            <Switch defaultChecked />
-          </div>
+          <Button onClick={handleSaveProfile} disabled={saving}>
+            {saving ? "Saving..." : "Save Preferences"}
+          </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Data Management</CardTitle>
-          <CardDescription>Export or delete your data</CardDescription>
+          <CardTitle>Currency</CardTitle>
+          <CardDescription>This app uses Indian Rupee (₹ INR) as the default currency</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Button variant="outline">Export Data</Button>
-            <Button variant="destructive">Delete Account</Button>
+        <CardContent>
+          <div className="p-4 bg-muted rounded-lg">
+            <p className="text-sm">
+              <strong>Current Currency:</strong> INR (₹) Indian Rupee
+            </p>
           </div>
         </CardContent>
       </Card>

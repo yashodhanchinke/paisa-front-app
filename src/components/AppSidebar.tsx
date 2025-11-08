@@ -1,4 +1,4 @@
-import { Home, Receipt, PieChart, Wallet, Settings, Plus, FolderOpen, Sparkles, Smartphone } from "lucide-react";
+import { Home, Receipt, PieChart, Wallet, Settings, Plus, FolderOpen, Sparkles } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -20,7 +20,6 @@ const menuItems = [
   { title: "Budgets", url: "/budgets", icon: Wallet },
   { title: "Analytics", url: "/analytics", icon: PieChart },
   { title: "AI Insights", url: "/reports", icon: Sparkles },
-  { title: "Mobile Preview", url: "/mobile-preview", icon: Smartphone },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

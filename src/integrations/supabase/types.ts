@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_insights: {
+        Row: {
+          created_at: string
+          id: string
+          insights: string
+          summary: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          insights: string
+          summary?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          insights?: string
+          summary?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          id: string
+          period: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          period?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          period?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           color: string | null
@@ -49,7 +111,9 @@ export type Database = {
           created_at: string
           currency: string | null
           email: string
+          full_name: string | null
           id: string
+          monthly_budget: number | null
           spending_alerts_enabled: boolean | null
           updated_at: string
           user_id: string
@@ -58,7 +122,9 @@ export type Database = {
           created_at?: string
           currency?: string | null
           email: string
+          full_name?: string | null
           id?: string
+          monthly_budget?: number | null
           spending_alerts_enabled?: boolean | null
           updated_at?: string
           user_id: string
@@ -67,7 +133,9 @@ export type Database = {
           created_at?: string
           currency?: string | null
           email?: string
+          full_name?: string | null
           id?: string
+          monthly_budget?: number | null
           spending_alerts_enabled?: boolean | null
           updated_at?: string
           user_id?: string
